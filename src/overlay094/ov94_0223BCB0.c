@@ -4,11 +4,13 @@
 #include <nitro.h>
 #include <string.h>
 
+#include "constants/gts.h"
 #include "constants/species.h"
 
-#include "struct_defs/struct_0203E0FC.h"
+#include "struct_defs/gts_player_data.h"
 #include "struct_defs/struct_02099F80.h"
 
+#include "overlay094/gts_application_state.h"
 #include "overlay094/ov94_0223B140.h"
 #include "overlay094/ov94_0223C610.h"
 #include "overlay094/ov94_0223D0C4.h"
@@ -21,7 +23,6 @@
 #include "overlay094/ov94_022443E0.h"
 #include "overlay094/ov94_022444C8.h"
 #include "overlay094/ov94_02244950.h"
-#include "overlay094/struct_ov94_0223FD4C.h"
 
 #include "bg_window.h"
 #include "char_transfer.h"
@@ -54,22 +55,23 @@
 
 static void ov94_0223BFE4(void *param0);
 static void ov94_0223C01C(void);
-static void ov94_0223C03C(UnkStruct_ov94_0223FD4C *param0, ApplicationManager *appMan);
-static void ov94_0223C0A0(UnkStruct_ov94_0223FD4C *param0);
+static void GTSApplicationState_InitPlayerData(GTSApplicationState *appState, ApplicationManager *appMan);
+static void ov94_0223C0A0(GTSApplicationState *param0);
 static void ov94_0223C0A4(void);
-static void ov94_0223C0D4(UnkStruct_ov94_0223FD4C *param0);
-static void ov94_0223C32C(UnkStruct_ov94_0223FD4C *param0);
+static void ov94_0223C0D4(GTSApplicationState *param0);
+static void ov94_0223C32C(GTSApplicationState *param0);
 static void ov94_0223C490(DWCAllocType param0, void *param1, u32 param2);
 static void *ov94_0223C468(DWCAllocType param0, u32 param1, int param2);
-static void ov94_0223C4E0(UnkStruct_ov94_0223FD4C *param0);
-static void ov94_0223C508(UnkStruct_ov94_0223FD4C *param0);
-static void ov94_0223C578(UnkStruct_ov94_0223FD4C *param0);
-static void ov94_0223C598(UnkStruct_ov94_0223FD4C *param0);
+static void ov94_0223C4E0(GTSApplicationState *param0);
+static void ov94_0223C508(GTSApplicationState *param0);
+static void GTSApplicationState_DecrementNetworkTimer(GTSApplicationState *appState);
+static void GTSApplicationState_CountBoxPokemon(GTSApplicationState *appState);
 
 static NNSFndHeapHandle Unk_ov94_02246C04;
 
-static int (*Unk_ov94_0224674C[][3])(UnkStruct_ov94_0223FD4C *, int) = {
-    { ov94_02244950, ov94_022449FC, ov94_02244A2C },
+// gtsApplicationScreens { init, main, exit }
+static int (*gtsApplicationScreens[][3])(GTSApplicationState *, int) = {
+    { GTSApplication_InitWFCScreen, GTSApplication_WFCInit_Main, GTSApplication_WFCInit_Exit }, // wfc
     { ov94_0223C610, ov94_0223C6D4, ov94_0223C6F4 },
     { ov94_0223D0C4, ov94_0223D19C, ov94_0223D1B0 },
     { ov94_0223DC04, ov94_0223DCE4, ov94_0223DCF8 },
@@ -81,11 +83,11 @@ static int (*Unk_ov94_0224674C[][3])(UnkStruct_ov94_0223FD4C *, int) = {
     { ov94_022444C8, ov94_02244678, ov94_0224484C },
 };
 
-UnkStruct_ov94_0223FD4C *Unk_ov94_02246C08;
+GTSApplicationState *unused_GTSApplicationState;
 
-int ov94_0223BCB0(ApplicationManager *appMan, int *param1)
+int GTSApplication_Init(ApplicationManager *appMan, int *param1)
 {
-    UnkStruct_ov94_0223FD4C *v0;
+    GTSApplicationState *v0;
 
     switch (*param1) {
     case 0:
@@ -99,10 +101,10 @@ int ov94_0223BCB0(ApplicationManager *appMan, int *param1)
 
         Heap_Create(HEAP_ID_APPLICATION, HEAP_ID_62, 0x70000);
 
-        v0 = ApplicationManager_NewData(appMan, sizeof(UnkStruct_ov94_0223FD4C), HEAP_ID_62);
-        memset(v0, 0, sizeof(UnkStruct_ov94_0223FD4C));
-        v0->unk_04 = BgConfig_New(HEAP_ID_62);
-        Unk_ov94_02246C08 = v0;
+        v0 = ApplicationManager_NewData(appMan, sizeof(GTSApplicationState), HEAP_ID_62);
+        memset(v0, 0, sizeof(GTSApplicationState));
+        v0->bgConfig = BgConfig_New(HEAP_ID_62);
+        unused_GTSApplicationState = v0;
 
         {
             GraphicsModes v1 = {
@@ -115,8 +117,8 @@ int ov94_0223BCB0(ApplicationManager *appMan, int *param1)
             SetAllGraphicsModes(&v1);
         }
 
-        v0->unk_B8C = StringTemplate_New(11, 64, HEAP_ID_62);
-        v0->unk_B90 = MessageLoader_Init(MESSAGE_LOADER_BANK_HANDLE, NARC_INDEX_MSGDATA__PL_MSG, TEXT_BANK_UNK_0671, HEAP_ID_62);
+        v0->stringTemplate = StringTemplate_New(11, 64, HEAP_ID_62);
+        v0->gtsMessageLoader = MessageLoader_Init(MESSAGE_LOADER_BANK_HANDLE, NARC_INDEX_MSGDATA__PL_MSG, TEXT_BANK_GTS, HEAP_ID_62);
         v0->unk_B98 = MessageLoader_Init(MESSAGE_LOADER_BANK_HANDLE, NARC_INDEX_MSGDATA__PL_MSG, TEXT_BANK_UNK_0674, HEAP_ID_62);
         v0->unk_B9C = MessageLoader_Init(MESSAGE_LOADER_BANK_HANDLE, NARC_INDEX_MSGDATA__PL_MSG, TEXT_BANK_UNK_0695, HEAP_ID_62);
         v0->unk_B94 = MessageLoader_Init(MESSAGE_LOADER_BANK_HANDLE, NARC_INDEX_MSGDATA__PL_MSG, TEXT_BANK_SPECIES_NAME, HEAP_ID_62);
@@ -124,7 +126,7 @@ int ov94_0223BCB0(ApplicationManager *appMan, int *param1)
 
         SetAutorepeat(4, 8);
 
-        ov94_0223C03C(v0, appMan);
+        GTSApplicationState_InitPlayerData(v0, appMan);
         ov94_0223C4E0(v0);
 
         Sound_SetSceneAndPlayBGM(SOUND_SCENE_11, SEQ_WIFILOBBY, 1);
@@ -134,77 +136,77 @@ int ov94_0223BCB0(ApplicationManager *appMan, int *param1)
         *param1 = 1;
         break;
     case 1:
-        sub_02099550();
-        sub_020995B4();
-        sub_02033478();
+        sub_02099550(); // load overlay4
+        sub_020995B4(); // load overlay60
+        WirelessDriver_Init(); // some network lock?
         (*param1) = 0;
-        return 1;
+        return 1; // pass through to main
         break;
     }
 
     return 0;
 }
 
-int ov94_0223BE2C(ApplicationManager *appMan, int *param1)
+int GTSApplication_Main(ApplicationManager *appMan, int *param1)
 {
-    UnkStruct_ov94_0223FD4C *v0 = ApplicationManager_Data(appMan);
+    GTSApplicationState *appState = ApplicationManager_Data(appMan);
 
     DWC_UpdateConnection();
     ov94_0223B15C();
 
     switch (*param1) {
-    case 0:
-        if (sub_020334A4()) {
-            Unk_ov94_02246C04 = v0->unk_50;
+    case GTS_APPLICATION_LOOP_STATE_WAIT_FOR_WIRELESS_DRIVER:
+        if (WirelessDriver_IsReady()) {
+            Unk_ov94_02246C04 = appState->unk_50;
             DWC_SetMemFunc(ov94_0223C468, ov94_0223C490);
             *param1 = 1;
         }
         break;
-    case 1:
-        *param1 = (*Unk_ov94_0224674C[v0->unk_14][0])(v0, *param1);
+    case GTS_APPLICATION_LOOP_STATE_INIT: // GTS_WFC_INIT_SCREEN
+        *param1 = (*gtsApplicationScreens[appState->screenId][0])(appState, *param1);
 
-        if (v0->unk_104) {
-            ov94_0223C508(v0);
+        if (appState->unk_104) {
+            ov94_0223C508(appState);
         }
         break;
-    case 2:
+    case GTS_APPLICATION_LOOP_STATE_WAIT_FADE: // GTS_WFC_VISIBLE
         if (IsScreenFadeDone()) {
             *param1 = 3;
         }
         break;
-    case 3:
-        *param1 = (*Unk_ov94_0224674C[v0->unk_14][1])(v0, *param1);
+    case GTS_APPLICATION_LOOP_STATE_MAIN: // GTS_WFC_CONNECTING
+        *param1 = (*gtsApplicationScreens[appState->screenId][1])(appState, *param1);
         break;
-    case 4:
+    case GTS_APPLICATION_LOOP_STATE_FINISH:
         if (IsScreenFadeDone()) {
-            if (v0->unk_104) {
-                ov94_0223C4E0(v0);
-                ov94_02243EF8(v0, TrainerInfo_Gender(v0->unk_00->unk_1C));
-                ov94_02244234(v0, v0->unk_118, 0);
-                ov94_0223D068(v0);
-                v0->unk_104 = 0;
+            if (appState->unk_104) { // pokemon received?
+                ov94_0223C4E0(appState);
+                ov94_02243EF8(appState, TrainerInfo_Gender(appState->unk_00->unk_1C));
+                ov94_02244234(appState, appState->unk_118, 0);
+                ov94_0223D068(appState);
+                appState->unk_104 = 0;
             }
-            *param1 = (*Unk_ov94_0224674C[v0->unk_14][2])(v0, *param1);
+            *param1 = (*gtsApplicationScreens[appState->screenId][2])(appState, *param1);
         }
         break;
-    case 5:
+    case GTS_APPLICATION_LOOP_STATE_EXIT:
         return 1;
         break;
     }
 
-    ov94_0223C578(v0);
-    ov94_0223C598(v0);
+    GTSApplicationState_DecrementNetworkTimer(appState);
+    GTSApplicationState_CountBoxPokemon(appState);
 
-    if (v0->unk_BE4 != NULL) {
-        SpriteList_Update(v0->unk_BE4);
+    if (appState->unk_BE4 != NULL) {
+        SpriteList_Update(appState->unk_BE4);
     }
 
     return 0;
 }
 
-int ov94_0223BF54(ApplicationManager *appMan, int *param1)
+int GTSApplication_Exit(ApplicationManager *appMan, int *param1)
 {
-    UnkStruct_ov94_0223FD4C *v0 = ApplicationManager_Data(appMan);
+    GTSApplicationState *v0 = ApplicationManager_Data(appMan);
     int v1;
 
     Heap_FreeToHeap(v0->unk_4C);
@@ -216,14 +218,14 @@ int ov94_0223BF54(ApplicationManager *appMan, int *param1)
     MessageLoader_Free(v0->unk_B94);
     MessageLoader_Free(v0->unk_B9C);
     MessageLoader_Free(v0->unk_B98);
-    MessageLoader_Free(v0->unk_B90);
+    MessageLoader_Free(v0->gtsMessageLoader);
     MessageLoader_Free(v0->unk_BA0);
-    StringTemplate_Free(v0->unk_B8C);
+    StringTemplate_Free(v0->stringTemplate);
 
     ov94_0223C0A0(v0);
 
-    sub_020334CC();
-    Heap_FreeToHeap(v0->unk_04);
+    WirelessDriver_Shutdown();
+    Heap_FreeToHeap(v0->bgConfig);
     Heap_FreeToHeap(v0->unk_00);
     ApplicationManager_FreeData(appMan);
     SetVBlankCallback(NULL, NULL);
@@ -234,7 +236,7 @@ int ov94_0223BF54(ApplicationManager *appMan, int *param1)
 
 static void ov94_0223BFE4(void *param0)
 {
-    UnkStruct_ov94_0223FD4C *v0 = param0;
+    GTSApplicationState *v0 = param0;
 
     if (v0->unk_1118) {
         v0->unk_1118(param0);
@@ -267,12 +269,12 @@ static void ov94_0223C01C(void)
     GXLayers_SetBanks(&v0);
 }
 
-static void ov94_0223C03C(UnkStruct_ov94_0223FD4C *param0, ApplicationManager *appMan)
+static void GTSApplicationState_InitPlayerData(GTSApplicationState *param0, ApplicationManager *appMan)
 {
-    param0->unk_00 = (UnkStruct_0203E0FC *)ApplicationManager_Args(appMan);
-    param0->unk_14 = 0;
+    param0->unk_00 = (GTSPlayerData *)ApplicationManager_Args(appMan);
+    param0->screenId = 0;
 
-    ov94_0223C4C0(param0, 0, 0);
+    ov94_Setunk_18Andunk_24(param0, 0, 0);
 
     param0->unk_10C = 0;
     param0->unk_B7A.species = SPECIES_NONE;
@@ -281,15 +283,15 @@ static void ov94_0223C03C(UnkStruct_ov94_0223FD4C *param0, ApplicationManager *a
     param0->unk_B7A.level2 = 0;
     param0->unk_B80.species = SPECIES_NONE;
     param0->unk_10F0 = 0;
-    param0->unk_110 = 18;
-    param0->unk_110C = 0;
-    param0->unk_110E = 0;
+    param0->selectedBoxId = MAX_PC_BOXES;
+    param0->deferredBoxPokemonCount = 0;
+    param0->deferredBoxId = 0;
     param0->unk_10F2 = 0;
-    param0->unk_10DC = NULL;
+    param0->waitDial = NULL;
     param0->unk_11B0 = 0;
 }
 
-static void ov94_0223C0A0(UnkStruct_ov94_0223FD4C *param0)
+static void ov94_0223C0A0(GTSApplicationState *param0)
 {
     return;
 }
@@ -309,7 +311,7 @@ static void ov94_0223C0A4(void)
     PlttTransfer_Clear();
 }
 
-static void ov94_0223C0D4(UnkStruct_ov94_0223FD4C *param0)
+static void ov94_0223C0D4(GTSApplicationState *param0)
 {
     int v0;
     NARC *v1 = NARC_ctor(NARC_INDEX_GRAPHIC__WORLDTRADE, HEAP_ID_62);
@@ -371,7 +373,7 @@ static void ov94_0223C0D4(UnkStruct_ov94_0223FD4C *param0)
     NARC_dtor(v1);
 }
 
-void ov94_0223C300(AffineSpriteListTemplate *param0, UnkStruct_ov94_0223FD4C *param1, SpriteResourcesHeader *param2, int param3)
+void ov94_0223C300(AffineSpriteListTemplate *param0, GTSApplicationState *param1, SpriteResourcesHeader *param2, int param3)
 {
     param0->list = param1->unk_BE4;
     param0->resourceData = param2;
@@ -385,7 +387,7 @@ void ov94_0223C300(AffineSpriteListTemplate *param0, UnkStruct_ov94_0223FD4C *pa
     param0->heapID = HEAP_ID_62;
 }
 
-static void ov94_0223C32C(UnkStruct_ov94_0223FD4C *param0)
+static void ov94_0223C32C(GTSApplicationState *param0)
 {
     int v0;
 
@@ -405,7 +407,7 @@ static const WindowTemplate Unk_ov94_022459F8 = {
     0x0
 };
 
-Menu *ov94_0223C3C0(BgConfig *param0, int param1, int param2)
+Menu *GTSApplication_CreateYesNoMenu(BgConfig *param0, int param1, int param2)
 {
     WindowTemplate v0;
 
@@ -413,13 +415,13 @@ Menu *ov94_0223C3C0(BgConfig *param0, int param1, int param2)
     v0.tilemapTop = param1;
     v0.baseTile = param2;
 
-    return Menu_MakeYesNoChoice(param0, &v0, (1 + (18 + 12)), 11, 62);
+    return Menu_MakeYesNoChoice(param0, &v0, (1 + (18 + 12)), 11, HEAP_ID_62);
 }
 
-void ov94_0223C3F4(UnkStruct_ov94_0223FD4C *param0, int param1, int param2)
+void GTSApplication_SetCurrentAndNextScreenInstruction(GTSApplicationState *param0, int param1, int param2)
 {
-    param0->unk_2C = param1;
-    param0->unk_30 = param2;
+    param0->currentScreenInstruction = param1;
+    param0->nextScreenInstruction = param2;
 }
 
 void ov94_0223C3FC(Sprite *param0, int param1, int param2)
@@ -466,29 +468,29 @@ static void ov94_0223C490(DWCAllocType param0, void *param1, u32 param2)
     OS_RestoreInterrupts(v0);
 }
 
-int ov94_0223C4B4(void)
+int GTSApplication_GetNetworkStrength(void)
 {
     return WM_LINK_LEVEL_3 - DWC_GetLinkLevel();
 }
 
-void ov94_0223C4C0(UnkStruct_ov94_0223FD4C *param0, int param1, int param2)
+void ov94_Setunk_18Andunk_24(GTSApplicationState *param0, int param1, int param2)
 {
     param0->unk_18 = param1;
     param0->unk_24 = param2;
 }
 
-void ov94_0223C4C8(UnkStruct_ov94_0223FD4C *param0)
+void GTSApplication_MoveToNextScreen(GTSApplicationState *param0)
 {
-    param0->unk_20 = param0->unk_14;
-    param0->unk_14 = param0->unk_18;
+    param0->unk_20 = param0->screenId;
+    param0->screenId = param0->unk_18;
 }
 
-int ov94_0223C4D4(UnkStruct_ov94_0223FD4C *param0)
+int ov94_0223C4D4(GTSApplicationState *param0)
 {
     return Options_TextFrameDelay(param0->unk_00->options);
 }
 
-static void ov94_0223C4E0(UnkStruct_ov94_0223FD4C *param0)
+static void ov94_0223C4E0(GTSApplicationState *param0)
 {
     ov94_0223C01C();
     ov94_0223C0A4();
@@ -498,7 +500,7 @@ static void ov94_0223C4E0(UnkStruct_ov94_0223FD4C *param0)
     SetVBlankCallback(ov94_0223BFE4, param0);
 }
 
-static void ov94_0223C508(UnkStruct_ov94_0223FD4C *param0)
+static void ov94_0223C508(GTSApplicationState *param0)
 {
     int v0;
 
@@ -521,40 +523,40 @@ static void ov94_0223C508(UnkStruct_ov94_0223FD4C *param0)
     PlttTransfer_Free();
 }
 
-static void ov94_0223C578(UnkStruct_ov94_0223FD4C *param0)
+static void GTSApplicationState_DecrementNetworkTimer(GTSApplicationState *param0)
 {
-    if (param0->unk_3A) {
-        param0->unk_3A--;
+    if (param0->networkTimer) {
+        param0->networkTimer--;
     }
 }
 
-void ov94_0223C584(UnkStruct_ov94_0223FD4C *param0)
+void GTSApplicationState_StartCountingBoxPokemon(GTSApplicationState *param0)
 {
-    param0->unk_110E = 1;
-    param0->unk_110C = 0;
+    param0->deferredBoxId = 1;
+    param0->deferredBoxPokemonCount = 0;
 }
 
-static void ov94_0223C598(UnkStruct_ov94_0223FD4C *param0)
+static void GTSApplicationState_CountBoxPokemon(GTSApplicationState *appState)
 {
-    if (param0->unk_110E) {
-        param0->unk_110C += PCBoxes_CountMonsInBox(param0->unk_00->pcBoxes, param0->unk_110E - 1);
-        param0->unk_110E++;
+    if (appState->deferredBoxId) {
+        appState->deferredBoxPokemonCount += PCBoxes_CountMonsInBox(appState->unk_00->pcBoxes, appState->deferredBoxId - 1);
+        appState->deferredBoxId++;
 
-        if (param0->unk_110E == 19) {
-            param0->unk_110E = 0;
+        if (appState->deferredBoxId == MAX_PC_BOXES + 1) {
+            appState->deferredBoxId = 0;
         }
     }
 }
 
-void ov94_0223C5D8(UnkStruct_ov94_0223FD4C *param0)
+void GTSApplicationState_AddWaitDial(GTSApplicationState *appState)
 {
-    param0->unk_10DC = Window_AddWaitDial(&param0->unk_F5C, 1);
+    appState->waitDial = Window_AddWaitDial(&appState->bottomInstructionWindow, 1);
 }
 
-void ov94_0223C5F4(UnkStruct_ov94_0223FD4C *param0)
+void GTSApplicationState_DestroyWaitDial(GTSApplicationState *appState)
 {
-    if (param0->unk_10DC != NULL) {
-        DestroyWaitDial(param0->unk_10DC);
-        param0->unk_10DC = NULL;
+    if (appState->waitDial != NULL) {
+        DestroyWaitDial(appState->waitDial);
+        appState->waitDial = NULL;
     }
 }
